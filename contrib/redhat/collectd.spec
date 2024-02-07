@@ -2069,6 +2069,7 @@ Collectd utilities
 	--enable-target_replace \
 	--enable-target_scale \
 	--enable-target_set \
+	--enable-target_sma \
 	--enable-target_v5upgrade \
 	%{?_with_aggregation} \
 	%{?_with_amqp} \
@@ -2361,6 +2362,7 @@ fi
 %{_libdir}/%{name}/target_replace.so
 %{_libdir}/%{name}/target_scale.so
 %{_libdir}/%{name}/target_set.so
+%{_libdir}/%{name}/target_sma.so
 %{_libdir}/%{name}/target_v5upgrade.so
 
 %if %{with_aggregation}

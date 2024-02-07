@@ -693,6 +693,9 @@ Features
     - target_set
       Set (overwrite) entire parts of an identifier.
 
+    - target_sma
+      Simple moving average of values.
+
   * Miscellaneous plugins:
 
     - aggregation

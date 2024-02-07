@@ -2062,6 +2062,12 @@ target_set_la_SOURCES = src/target_set.c
 target_set_la_LDFLAGS = $(PLUGIN_LDFLAGS)
 endif
 
+if BUILD_PLUGIN_TARGET_SMA
+pkglib_LTLIBRARIES += target_sma.la
+target_sma_la_SOURCES = src/target_sma.c
+target_sma_la_LDFLAGS = $(PLUGIN_LDFLAGS)
+endif
+
 if BUILD_PLUGIN_TARGET_V5UPGRADE
 pkglib_LTLIBRARIES += target_v5upgrade.la
 target_v5upgrade_la_SOURCES = src/target_v5upgrade.c
