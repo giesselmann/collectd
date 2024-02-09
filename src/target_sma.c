@@ -21,7 +21,7 @@
  * DEALINGS IN THE SOFTWARE.
  *
  * Authors:
- *   Florian Forster <octo at collectd.org>
+ *   Pay Giesselmann <giesselmann at dkrz.de>
  **/
 
 #include "collectd.h"
@@ -29,9 +29,7 @@
 #include "filter_chain.h"
 #include "utils/common/common.h"
 
-#include "utils_cache.h"
-
-struct ts_data_s {
+struct tsma_data_s {
   int window;
   int *window_ptr;
   double *window_buffer;
@@ -39,10 +37,10 @@ struct ts_data_s {
   char **data_sources;
   size_t data_sources_num;
 };
-typedef struct ts_data_s ts_data_t;
+typedef struct tsma_data_s tsma_data_t;
 
 static int tsma_invoke_gauge(const data_set_t *ds, value_list_t *vl, /* {{{ */
-                           ts_data_t *data, int dsrc_index) {
+                           tsma_data_t *data, int dsrc_index) {
   const int window = data->window;
   const int window_offset = dsrc_index * window;
   // store new value at pos of oldest
@@ -57,7 +55,7 @@ static int tsma_invoke_gauge(const data_set_t *ds, value_list_t *vl, /* {{{ */
   return 0;
 } /* }}} int tsma_invoke_gauge */
 
-static int ts_config_set_int(int *ret, oconfig_item_t *ci) /* {{{ */
+static int tsma_config_set_int(int *ret, oconfig_item_t *ci) /* {{{ */
 {
   if ((ci->values_num != 1) || (ci->values[0].type != OCONFIG_TYPE_NUMBER)) {
     WARNING("sma target: The `%s' config option needs "
@@ -67,12 +65,12 @@ static int ts_config_set_int(int *ret, oconfig_item_t *ci) /* {{{ */
   }
 
   *ret = ci->values[0].value.number;
-  DEBUG("ts_config_set_int: *ret = %g", *ret);
+  DEBUG("tsma_config_set_int: *ret = %g", *ret);
 
   return 0;
-} /* }}} int ts_config_set_int */
+} /* }}} int tsma_config_set_int */
 
-static int ts_config_add_data_source(ts_data_t *data, /* {{{ */
+static int tsma_config_add_data_source(tsma_data_t *data, /* {{{ */
                                      oconfig_item_t *ci) {
   size_t new_data_sources_num;
   char **temp;
@@ -122,16 +120,16 @@ static int ts_config_add_data_source(ts_data_t *data, /* {{{ */
   }
 
   return 0;
-} /* }}} int ts_config_add_data_source */
+} /* }}} int tsma_config_add_data_source */
 
 static int tsma_destroy(void **user_data) /* {{{ */
 {
-  ts_data_t *data;
+  tsma_data_t *data;
 
   if (user_data == NULL)
     return -EINVAL;
 
-  data = (ts_data_t *)*user_data;
+  data = (tsma_data_t *)*user_data;
 
   if ((data != NULL) && (data->data_sources != NULL)) {
     for (size_t i = 0; i < data->data_sources_num; i++)
@@ -147,13 +145,13 @@ static int tsma_destroy(void **user_data) /* {{{ */
 
   sfree(data);
   *user_data = NULL;
- 
+
   return 0;
 } /* }}} int tsma_destroy */
 
 static int tsma_create(const oconfig_item_t *ci, void **user_data) /* {{{ */
 {
-  ts_data_t *data;
+  tsma_data_t *data;
   int status;
 
   data = calloc(1, sizeof(*data));
@@ -171,9 +169,9 @@ static int tsma_create(const oconfig_item_t *ci, void **user_data) /* {{{ */
     oconfig_item_t *child = ci->children + i;
 
     if (strcasecmp("Window", child->key) == 0)
-      status = ts_config_set_int(&data->window, child);
+      status = tsma_config_set_int(&data->window, child);
     else if (strcasecmp("DataSource", child->key) == 0)
-      status = ts_config_add_data_source(data, child);
+      status = tsma_config_add_data_source(data, child);
     else {
       ERROR("Target `sma': The `%s' configuration option is not understood "
             "and will be ignored.",
@@ -197,7 +195,7 @@ static int tsma_create(const oconfig_item_t *ci, void **user_data) /* {{{ */
 static int tsma_invoke(const data_set_t *ds, value_list_t *vl, /* {{{ */
                      notification_meta_t __attribute__((unused)) * *meta,
                      void **user_data) {
-  ts_data_t *data;
+  tsma_data_t *data;
 
   if ((ds == NULL) || (vl == NULL) || (user_data == NULL))
     return -EINVAL;
