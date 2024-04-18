@@ -49,9 +49,14 @@ static int tsma_invoke_gauge(const data_set_t *ds, value_list_t *vl, /* {{{ */
   {
     // Exponentially weighted average
     const double last_value = data->window_buffer[window_offset];
+<<<<<<< HEAD
     const double next_value = vl->values[dsrc_index].gauge * data->weight + last_value * (1 - data->weight);
     vl->values[dsrc_index].gauge = next_value;
     data->window_buffer[window_offset] = next_value;
+=======
+    vl->values[dsrc_index].gauge = vl->values[dsrc_index].gauge * data->weight + last_value * (1 - data->weight);
+    data->window_buffer[window_offset] = last_value;
+>>>>>>> origin/sma
   } 
   else 
   {
