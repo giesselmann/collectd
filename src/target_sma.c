@@ -31,6 +31,7 @@
 
 struct tsma_data_s {
   int window;
+  double weight;
   int *window_ptr;
   double *window_buffer;
 
@@ -43,15 +44,29 @@ static int tsma_invoke_gauge(const data_set_t *ds, value_list_t *vl, /* {{{ */
                            tsma_data_t *data, int dsrc_index) {
   const int window = data->window;
   const int window_offset = dsrc_index * window;
-  // store new value at pos of oldest
-  data->window_buffer[window_offset + data->window_ptr[dsrc_index]] = vl->values[dsrc_index].gauge;
-  data->window_ptr[dsrc_index] = (data->window_ptr[dsrc_index] + 1) % window;
-  // average of current window
-  double window_sum = 0.0;
-  for (int i = window_offset; i < window_offset + window; i++) {
-    window_sum += data->window_buffer[i];
+  
+  if (window == 1)
+  {
+    // Exponentially weighted average
+    const double last_value = data->window_buffer[window_offset];
+    const double next_value = vl->values[dsrc_index].gauge * data->weight + last_value * (1 - data->weight);
+    vl->values[dsrc_index].gauge = next_value;
+    data->window_buffer[window_offset] = next_value;
+  } 
+  else 
+  {
+    // Simple sliding widnow average
+    // store new value at pos of oldest
+    data->window_buffer[window_offset + data->window_ptr[dsrc_index]] = vl->values[dsrc_index].gauge;
+    data->window_ptr[dsrc_index] = (data->window_ptr[dsrc_index] + 1) % window;
+    // average of current window
+    double window_sum = 0.0;
+    for (int i = window_offset; i < window_offset + window; i++) {
+      window_sum += data->window_buffer[i];
+    }
+    vl->values[dsrc_index].gauge = window_sum / (double)window;
   }
-  vl->values[dsrc_index].gauge = window_sum / (double)window;
+
   return 0;
 } /* }}} int tsma_invoke_gauge */
 
@@ -65,7 +80,22 @@ static int tsma_config_set_int(int *ret, oconfig_item_t *ci) /* {{{ */
   }
 
   *ret = ci->values[0].value.number;
-  DEBUG("tsma_config_set_int: *ret = %g", *ret);
+  DEBUG("tsma_config_set_int: *ret = %i", *ret);
+
+  return 0;
+} /* }}} int tsma_config_set_int */
+
+static int tsma_config_set_double(double *ret, oconfig_item_t *ci) /* {{{ */
+{
+  if ((ci->values_num != 1) || (ci->values[0].type != OCONFIG_TYPE_NUMBER)) {
+    WARNING("sma target: The `%s' config option needs "
+            "exactly one numeric argument.",
+            ci->key);
+    return -1;
+  }
+
+  *ret = ci->values[0].value.number;
+  DEBUG("tsma_config_set_double: *ret = %g", *ret);
 
   return 0;
 } /* }}} int tsma_config_set_int */
@@ -161,6 +191,7 @@ static int tsma_create(const oconfig_item_t *ci, void **user_data) /* {{{ */
   }
 
   data->window = 1;
+  data->weight = 1.0;
   data->window_buffer = NULL;
   data->window_ptr = NULL;
 
@@ -170,6 +201,8 @@ static int tsma_create(const oconfig_item_t *ci, void **user_data) /* {{{ */
 
     if (strcasecmp("Window", child->key) == 0)
       status = tsma_config_set_int(&data->window, child);
+    else if (strcasecmp("Weight", child->key) == 0)
+      status = tsma_config_set_double(&data->weight, child);
     else if (strcasecmp("DataSource", child->key) == 0)
       status = tsma_config_add_data_source(data, child);
     else {
@@ -181,6 +214,17 @@ static int tsma_create(const oconfig_item_t *ci, void **user_data) /* {{{ */
 
     if (status != 0)
       break;
+  }
+
+  /* Additional sanity-checking */
+  if (data->window < 1) {
+    ERROR("Target `sma': Window must be >= 1");
+    status = -1;
+  }
+  if (data->window != 1 && data->weight != 1.0)
+  {
+    ERROR("Target `sma': Options Window and Weight are mutually exclusive!");
+    status = -1;
   }
 
   if (status != 0) {
@@ -207,7 +251,7 @@ static int tsma_invoke(const data_set_t *ds, value_list_t *vl, /* {{{ */
   }
   // allocate buffer
   if (data->window_buffer == NULL) {
-    data->window_ptr = calloc(1, data->window * sizeof(int));
+    data->window_ptr = calloc(ds->ds_num, 1 * sizeof(int));
     data->window_buffer = calloc(ds->ds_num, data->window * sizeof(double));
     if ((data->window_buffer == NULL) || (data->window_ptr == NULL)) {
       ERROR("Target `sma': Failed to allocated buffer");
